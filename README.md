@@ -19,12 +19,9 @@ web/      React + TypeScript + Vite. Lobby, table, feedback sheet, session summa
 
 ## Running it locally
 
-Requirements: JDK 21, Gradle 8.x (only once, to create the wrapper), Node 20+.
+Requirements: JDK 21 (point JAVA_HOME at it), Node 20+.
 
 ```bash
-# one time: create the Gradle wrapper
-gradle wrapper
-
 # terminal 1: API on http://localhost:7070
 ./gradlew :server:run
 
