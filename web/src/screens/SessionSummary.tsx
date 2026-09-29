@@ -1,5 +1,5 @@
 import type { SessionView } from '../api/types';
-import { bb, signedBb } from '../lib/format';
+import { signedBb } from '../lib/format';
 
 interface Props {
   session: SessionView;
@@ -9,7 +9,7 @@ interface Props {
 
 /**
  * First cut of the session summary: the real totals the server tracks today. The street
- * breakdown and "biggest leaks" list from the design need stored decision history (milestone 4).
+ * breakdown and "biggest leaks" list from the design need stored decision history (milestone 1).
  */
 export function SessionSummary({ session, onPlayAgain, onLobby }: Props) {
   const graded = session.decisions;
@@ -24,13 +24,12 @@ export function SessionSummary({ session, onPlayAgain, onLobby }: Props) {
         <span className="eyebrow" style={{ fontSize: 16, paddingBottom: 8 }}>bb {session.netBb >= 0 ? 'won' : 'lost'}</span>
       </div>
       <div className="stat-tiles">
-        <Tile label="EV lost" value={`${bb(session.evLostBb)}`} unit="bb" />
         <Tile label="Decisions" value={String(session.decisions)} />
         <Tile label="Good decisions" value={String(goodPct)} unit="%" />
         <Tile label="Mistakes" value={String(session.mistakes)} />
       </div>
       <p className="muted" style={{ maxWidth: 560, fontSize: 15, lineHeight: 1.5, margin: 0 }}>
-        EV lost and grades only count call-or-fold decisions for now. Bets and raises get graded once solver data is in.
+        Grades come from the coach. The street breakdown and biggest leaks need stored hand history, which is next on the plan.
       </p>
       <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
         <button type="button" className="btn btn-soft" onClick={onLobby}>Back to lobby</button>

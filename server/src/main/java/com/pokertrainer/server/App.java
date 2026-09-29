@@ -1,6 +1,7 @@
 package com.pokertrainer.server;
 
 import com.pokertrainer.server.api.Dto;
+import com.pokertrainer.server.coach.CoachService;
 import com.pokertrainer.server.session.SessionStore;
 import io.javalin.Javalin;
 
@@ -11,11 +12,12 @@ import java.util.NoSuchElementException;
  * TrainingSession, which have no web dependencies and are tested directly.
  *
  * <p>The web app's dev server proxies /api to this port, so no CORS setup is needed locally.
+ * Set ANTHROPIC_API_KEY to turn on the AI coach; without it the rules coach answers.
  */
 public final class App {
     public static void main(String[] args) {
         int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "7070"));
-        SessionStore store = new SessionStore();
+        SessionStore store = new SessionStore(CoachService.fromEnv());
 
         Javalin app = Javalin.create();
 
@@ -26,6 +28,12 @@ public final class App {
         app.post("/api/sessions/{id}/hands", ctx -> ctx.json(store.get(ctx.pathParam("id")).dealNext()));
         app.post("/api/sessions/{id}/actions", ctx ->
             ctx.json(store.get(ctx.pathParam("id")).act(ctx.bodyAsClass(Dto.ActionRequest.class))));
+        app.get("/api/sessions/{id}/hands/{hand}/decisions/{index}/coach", ctx ->
+            ctx.json(store.get(ctx.pathParam("id")).coach(
+                ctx.pathParamAsClass("hand", Integer.class).get(),
+                ctx.pathParamAsClass("index", Integer.class).get())));
+        app.get("/api/sessions/{id}/hands/{hand}/review", ctx ->
+            ctx.json(store.get(ctx.pathParam("id")).review(ctx.pathParamAsClass("hand", Integer.class).get())));
 
         app.exception(IllegalArgumentException.class, (e, ctx) -> ctx.status(400).json(new Dto.ErrorView(e.getMessage())));
         app.exception(IllegalStateException.class, (e, ctx) -> ctx.status(409).json(new Dto.ErrorView(e.getMessage())));

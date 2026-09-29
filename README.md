@@ -41,6 +41,30 @@ Tests:
 cd web && npm run build # typecheck + production build
 ```
 
+## The coach
+
+Every decision you make gets a verdict (good, inaccuracy, mistake), a headline, one or two
+sentences of explanation and a tip. The table keeps moving while the coach thinks, and the
+feedback sheet fills in when the answer arrives.
+
+- **AI coach.** Set `ANTHROPIC_API_KEY` before starting the server and each decision is sent to
+  Claude with the full table state: positions, stacks, cards, board, the action so far, your
+  options, the bots' known styles, and the background numbers below. The reply is forced through
+  a tool call with a fixed schema at temperature 0, which keeps the format and tone consistent.
+  `COACH_MODEL` picks the model (default: a fast Haiku model, since this runs on every decision).
+- **Rules coach.** Without a key, or if a call fails or takes longer than 20 seconds, a
+  deterministic rules coach answers instead. You always get feedback.
+- **The numbers stay in the review.** Equity, pot odds, stack-to-pot ratio, the opening chart and
+  the pot-odds check are computed for every decision. They go to the coach as context and are
+  shown in the end-of-hand review, not in the live sheet.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+./gradlew :server:run
+```
+
+The key only lives on the server. The browser never sees it.
+
 ## API
 
 | Method | Path | What it does |
@@ -48,7 +72,9 @@ cd web && npm run build # typecheck + production build
 | GET | `/api/lobby` | Bots and lineup presets |
 | POST | `/api/sessions` | `{format: "SIX_MAX" \| "HEADS_UP", preset?, lineup?, stackBb?, seed?}`. Creates a session and deals the first hand |
 | GET | `/api/sessions/{id}` | Current session and hand |
-| POST | `/api/sessions/{id}/actions` | `{type, amount}` copied from one of `hand.legalActions`. Returns the new state and feedback on that decision |
+| POST | `/api/sessions/{id}/actions` | `{type, amount}` copied from one of `hand.legalActions`. Returns the new state and a `decision` handle |
+| GET | `/api/sessions/{id}/hands/{hand}/decisions/{index}/coach` | The coach's feedback for one decision. Waits until it is ready |
+| GET | `/api/sessions/{id}/hands/{hand}/review` | Every decision in a hand with the coach's verdict and the background numbers |
 | POST | `/api/sessions/{id}/hands` | Deals the next hand |
 
 The server runs bots until it is the hero's turn or the hand ends, so every response is a state
@@ -64,8 +90,9 @@ where the hero has something to do (or the hand is over).
   removal is automatic.
 - **Stacks reset each hand** to the chosen depth, so every spot is at a known stack depth.
 - **The hero is always seat 0** and the button moves, so you play every position.
-- **Numbers never come from the language model.** The coach layer (later) only explains structured
-  feedback that the solver or heuristic produced.
+- **The coach explains, the math decides the facts.** The language model sees the background
+  numbers and is told not to contradict the pot-odds check or quote figures, and the live sheet
+  shows no numbers at all.
 
 ## What is real and what is a placeholder
 
@@ -76,8 +103,8 @@ the API. A fuzz test plays thousands of random hands at every table size and che
 Placeholders, clearly marked in code:
 
 - `ProfileBot` decides from equity against random hands plus a few personality knobs.
-- `HeuristicFeedbackProvider` grades only call/fold decisions (equity vs pot odds) and returns an
-  ungraded INFO result for bets, checks and raises. Everything it returns is flagged as an estimate.
+- The background numbers use equity against random hands, which runs high when opponents have
+  shown strength, and approximate opening charts (`PreflopCharts`). Solver lines come later.
 - Sessions live in memory.
 
 See the development plan for the order these get replaced.

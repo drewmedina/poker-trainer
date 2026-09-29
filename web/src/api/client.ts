@@ -1,4 +1,12 @@
-import type { ActionResult, ActionView, CreateSessionRequest, LobbyView, SessionView } from './types';
+import type {
+  ActionResult,
+  ActionView,
+  CoachView,
+  CreateSessionRequest,
+  LobbyView,
+  ReviewView,
+  SessionView,
+} from './types';
 
 export class ApiError extends Error {}
 
@@ -39,4 +47,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ type: action.type, amount: action.amount }),
     }),
+
+  /** Waits on the server until the coach has answered (a few seconds at most). */
+  coach: (sessionId: string, hand: number, index: number) =>
+    request<CoachView>(`/api/sessions/${sessionId}/hands/${hand}/decisions/${index}/coach`),
+
+  review: (sessionId: string, hand: number) =>
+    request<ReviewView>(`/api/sessions/${sessionId}/hands/${hand}/review`),
 };

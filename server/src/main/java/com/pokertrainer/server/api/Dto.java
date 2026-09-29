@@ -23,17 +23,17 @@ public final class Dto {
 
     public record BotView(String id, String name, String style, String description) {}
 
-    public record LobbyView(List<BotView> bots, Map<String, List<String>> presets) {}
+    public record LobbyView(List<BotView> bots, Map<String, List<String>> presets, boolean aiCoach) {}
 
     public record SessionView(
         String id,
         String format,
         int handNumber,
         double netBb,
-        double evLostBb,
         int decisions,
         int goodDecisions,
         int mistakes,
+        boolean aiCoach,
         HandView hand) {}
 
     public record HandView(
@@ -71,20 +71,46 @@ public final class Dto {
 
     public record ResultView(boolean showdown, List<Integer> winners, double heroNetBb, String summary) {}
 
-    public record FeedbackView(
-        String verdict,
-        double evLossBb,
-        String headline,
-        String detail,
+    /** Returned right after an action. Fetch the coach feedback for it separately. */
+    public record DecisionView(int handNumber, int index, String street, String actionLabel) {}
+
+    public record ActionResult(SessionView session, DecisionView decision) {}
+
+    /** verdict: GOOD, INACCURACY or MISTAKE. source: "ai" or "rules". */
+    public record CoachView(String verdict, String headline, String explanation, String tip, String source) {}
+
+    /** The background numbers, only shown in the hand review. */
+    public record NumbersView(
         double equity,
         double potOdds,
-        Map<String, Double> frequencies,
-        boolean multiway,
-        boolean estimate,
-        String source,
-        String actionLabel) {}
+        double spr,
+        String chartPosition,
+        Boolean chartOpens,
+        double chartShare,
+        String mathVerdict,
+        double mathEvLossBb,
+        String mathNote) {}
 
-    public record ActionResult(SessionView session, FeedbackView feedback) {}
+    public record DecisionReview(
+        int index,
+        String street,
+        String position,
+        List<String> board,
+        double potBb,
+        double toCallBb,
+        int playersInHand,
+        String actionLabel,
+        List<String> options,
+        CoachView coach,
+        NumbersView numbers) {}
+
+    public record ReviewView(
+        int handNumber,
+        boolean finished,
+        List<String> heroCards,
+        List<String> board,
+        ResultView result,
+        List<DecisionReview> decisions) {}
 
     public record ErrorView(String error) {}
 }

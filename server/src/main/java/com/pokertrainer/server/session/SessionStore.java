@@ -3,6 +3,7 @@ package com.pokertrainer.server.session;
 import com.pokertrainer.engine.bots.BotProfile;
 import com.pokertrainer.engine.feedback.HeuristicFeedbackProvider;
 import com.pokertrainer.server.api.Dto;
+import com.pokertrainer.server.coach.CoachService;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -15,10 +16,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory sessions. Fine for local development and a single server. Move to Postgres
- * (sessions, hands, decisions) in milestone 4, when the review and leak screens need history.
+ * (sessions, hands, decisions) when the review and leak screens need history across restarts.
  */
 public final class SessionStore {
     private final Map<String, TrainingSession> sessions = new ConcurrentHashMap<>();
+    private final CoachService coach;
+
+    public SessionStore(CoachService coach) {
+        this.coach = coach;
+    }
 
     public Dto.LobbyView lobby() {
         List<Dto.BotView> bots = Arrays.stream(BotProfile.values())
@@ -26,7 +32,7 @@ public final class SessionStore {
             .toList();
         Map<String, List<String>> presets = new LinkedHashMap<>();
         Lineups.PRESETS.forEach((k, v) -> presets.put(k, v.stream().map(b -> b.id).toList()));
-        return new Dto.LobbyView(bots, presets);
+        return new Dto.LobbyView(bots, presets, coach.aiEnabled());
     }
 
     public Dto.SessionView create(Dto.CreateSessionRequest req) {
@@ -37,7 +43,7 @@ public final class SessionStore {
         Random rng = req.seed() == null ? new Random() : new Random(req.seed());
         String id = UUID.randomUUID().toString();
         TrainingSession s = new TrainingSession(id, format, lineup, stackBb, rng,
-            new HeuristicFeedbackProvider(new Random(rng.nextLong()), 2500));
+            new HeuristicFeedbackProvider(new Random(rng.nextLong()), 2500), coach);
         sessions.put(id, s);
         return s.dealNext();
     }

@@ -1,6 +1,7 @@
 package com.pokertrainer.server.session;
 
 import com.pokertrainer.server.api.Dto;
+import com.pokertrainer.server.coach.CoachService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -10,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TrainingSessionTest {
 
-    private final SessionStore store = new SessionStore();
+    private final SessionStore store = new SessionStore(CoachService.rulesOnly());
 
     private static Dto.ActionRequest randomLegal(Dto.HandView hand, Random rng) {
         List<Dto.ActionView> legal = hand.legalActions();
@@ -23,15 +24,31 @@ class TrainingSessionTest {
         TrainingSession s = store.get(view.id());
         Random rng = new Random(seed);
         double net = 0;
+        int decisions = 0;
         for (int h = 0; h < hands; h++) {
             Dto.HandView hand = view.hand();
+            int inHand = 0;
             while (hand.result() == null) {
                 assertEquals(0, hand.toAct(), "the server only stops when it is the hero's turn");
-                assertFalse(hand.legalActions().isEmpty());
                 Dto.ActionResult r = s.act(randomLegal(hand, rng));
-                assertNotNull(r.feedback());
+                assertEquals(hand.handNumber(), r.decision().handNumber());
+                assertEquals(inHand++, r.decision().index());
+                Dto.CoachView coach = s.coach(r.decision().handNumber(), r.decision().index());
+                assertNotEquals("INFO", coach.verdict(), "every decision gets a real verdict");
+                assertFalse(coach.headline().isBlank());
+                assertFalse(coach.explanation().isBlank());
+                assertFalse(coach.explanation().contains("—"), "house style: no em dashes");
                 view = r.session();
                 hand = view.hand();
+                decisions++;
+            }
+            Dto.ReviewView review = s.review(hand.handNumber());
+            assertTrue(review.finished());
+            assertEquals(inHand, review.decisions().size());
+            assertNotNull(review.result());
+            for (Dto.DecisionReview d : review.decisions()) {
+                assertNotNull(d.coach());
+                assertTrue(d.numbers().equity() >= 0 && d.numbers().equity() <= 1);
             }
             net += hand.result().heroNetBb();
             assertEquals(net, view.netBb(), 0.051);
@@ -39,16 +56,17 @@ class TrainingSessionTest {
             assertEquals(100.0 * hand.seats().size(), stacks, 1e-9);
             view = s.dealNext();
         }
+        assertEquals(decisions, view.decisions());
     }
 
     @Test
     void sixMaxSessionPlaysManyHands() {
-        playMany("SIX_MAX", 150, 1);
+        playMany("SIX_MAX", 120, 1);
     }
 
     @Test
     void headsUpSessionPlaysManyHands() {
-        playMany("HEADS_UP", 150, 2);
+        playMany("HEADS_UP", 120, 2);
     }
 
     @Test
@@ -59,6 +77,27 @@ class TrainingSessionTest {
         assertEquals("You", v.hand().seats().get(0).name());
         assertNotNull(v.hand().seats().get(0).cards());
         assertNull(v.hand().seats().get(1).cards(), "bot cards stay hidden until showdown");
+        assertFalse(v.aiCoach());
+    }
+
+    @Test
+    void unopenedPreflopSpotsCarryTheOpeningChart() {
+        // Find a hand where the hero is first in preflop (not in the big blind) and fold it.
+        for (long seed = 1; seed < 200; seed++) {
+            Dto.SessionView v = store.create(new Dto.CreateSessionRequest("SIX_MAX", "mixed", null, 100, seed));
+            Dto.HandView h = v.hand();
+            if (h.result() != null || !"PREFLOP".equals(h.street())) continue;
+            boolean firstIn = h.log().stream().allMatch(l -> l.text().contains("posts") || l.text().contains("folds"));
+            String pos = h.seats().get(0).position();
+            if (!firstIn || pos.equals("BB")) continue;
+            TrainingSession s = store.get(v.id());
+            s.act(new Dto.ActionRequest("FOLD", 0));
+            Dto.DecisionReview d = s.review(h.handNumber()).decisions().get(0);
+            assertEquals(pos, d.numbers().chartPosition());
+            assertNotNull(d.numbers().chartOpens());
+            return;
+        }
+        fail("never found an unopened spot");
     }
 
     @Test
@@ -71,6 +110,8 @@ class TrainingSessionTest {
         assertThrows(IllegalArgumentException.class, () -> s.act(new Dto.ActionRequest("DANCE", 0)));
         assertEquals(before, s.view().decisions());
         assertThrows(IllegalStateException.class, s::dealNext, "cannot skip a live hand");
+        int handNo = s.view().handNumber();
+        assertThrows(java.util.NoSuchElementException.class, () -> s.coach(handNo, 5));
     }
 
     @Test

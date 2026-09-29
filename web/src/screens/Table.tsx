@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { api } from '../api/client';
-import type { ActionView, FeedbackView, SeatView, SessionView } from '../api/types';
+import type { ActionView, SeatView, SessionView } from '../api/types';
 import { Avatar } from '../components/Avatar';
-import { FeedbackSheet } from '../components/FeedbackSheet';
+import { CoachSheet, type DecisionEntry } from '../components/CoachSheet';
 import { CardBack, CardSlot, PlayingCard } from '../components/PlayingCard';
 import { bb, signedBb } from '../lib/format';
 import type { FeedbackTiming } from './Lobby';
@@ -21,19 +21,23 @@ const STREETS = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'] as const;
 interface Props {
   session: SessionView;
   timing: FeedbackTiming;
+  entries: DecisionEntry[];
+  onEntries: (update: (list: DecisionEntry[]) => DecisionEntry[]) => void;
   onSession: (s: SessionView) => void;
+  onReview: (handNumber: number) => void;
   onEnd: () => void;
 }
 
-export function Table({ session, timing, onSession, onEnd }: Props) {
+export function Table({ session, timing, entries, onEntries, onSession, onReview, onEnd }: Props) {
   const hand = session.hand!;
-  const [feedback, setFeedback] = useState<FeedbackView | null>(null);
-  const [handFeedback, setHandFeedback] = useState<FeedbackView[]>([]);
+  // Index of the decision whose feedback is open, or null.
+  const [showing, setShowing] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const heroToAct = hand.result === null && hand.toAct === hand.heroSeat;
-  const sheetOpen = feedback !== null || hand.result !== null;
+  const shownEntry = showing === null ? null : entries.find((e) => e.decision.index === showing) ?? null;
+  const sheetOpen = shownEntry !== null || hand.result !== null;
 
   const act = useCallback(
     async (action: ActionView) => {
@@ -42,16 +46,22 @@ export function Table({ session, timing, onSession, onEnd }: Props) {
       setError(null);
       try {
         const r = await api.act(session.id, action);
+        const d = r.decision;
         onSession(r.session);
-        setHandFeedback((list) => [...list, r.feedback]);
-        if (timing === 'each') setFeedback(r.feedback);
+        onEntries((list) => [...list, { decision: d, coach: null }]);
+        if (timing === 'each') setShowing(d.index);
+        // The coach runs in the background on the server; this call waits for its answer.
+        api
+          .coach(session.id, d.handNumber, d.index)
+          .then((coach) => onEntries((list) => list.map((e) => (e.decision.index === d.index && e.decision.handNumber === d.handNumber ? { ...e, coach } : e))))
+          .catch((err: Error) => onEntries((list) => list.map((e) => (e.decision.index === d.index && e.decision.handNumber === d.handNumber ? { ...e, error: err.message } : e))));
       } catch (e) {
         setError((e as Error).message);
       } finally {
         setBusy(false);
       }
     },
-    [busy, session.id, onSession, timing],
+    [busy, session.id, onSession, onEntries, timing],
   );
 
   const nextHand = useCallback(async () => {
@@ -60,15 +70,15 @@ export function Table({ session, timing, onSession, onEnd }: Props) {
     setError(null);
     try {
       const s = await api.nextHand(session.id);
-      setFeedback(null);
-      setHandFeedback([]);
+      setShowing(null);
+      onEntries(() => []);
       onSession(s);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }, [busy, session.id, onSession]);
+  }, [busy, session.id, onSession, onEntries]);
 
   // Keyboard: 1-9 pick an action, Space or Enter continues.
   useEffect(() => {
@@ -77,7 +87,7 @@ export function Table({ session, timing, onSession, onEnd }: Props) {
       if (sheetOpen && (e.key === ' ' || e.key === 'Enter')) {
         e.preventDefault();
         if (hand.result) nextHand();
-        else setFeedback(null);
+        else setShowing(null);
         return;
       }
       const n = Number(e.key);
@@ -110,7 +120,7 @@ export function Table({ session, timing, onSession, onEnd }: Props) {
         <div className="header-right">
           <span className="pill"><span className="muted">Hand</span><span className="mono">{session.handNumber}</span></span>
           <span className="pill"><span className="muted">Net</span><span className="mono">{signedBb(session.netBb)}bb</span></span>
-          <span className="pill"><span className="muted">EV lost</span><span className="mono">{bb(session.evLostBb)}bb</span></span>
+          <span className="pill"><span className="muted">Good</span><span className="mono">{session.goodDecisions}/{session.decisions}</span></span>
           <button type="button" className="pill" onClick={onEnd} style={{ fontWeight: 600 }}>End session</button>
         </div>
       </header>
@@ -165,12 +175,13 @@ export function Table({ session, timing, onSession, onEnd }: Props) {
         {!sheetOpen && !heroToAct && <div className="waiting">Dealing…</div>}
 
         {sheetOpen && (
-          <FeedbackSheet
-            feedback={feedback}
+          <CoachSheet
+            entry={shownEntry}
             hand={hand}
-            handFeedback={handFeedback}
-            onContinue={() => setFeedback(null)}
+            entries={entries}
+            onContinue={() => setShowing(null)}
             onNextHand={nextHand}
+            onReview={() => onReview(hand.handNumber)}
             busy={busy}
           />
         )}

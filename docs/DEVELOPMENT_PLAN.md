@@ -21,7 +21,10 @@ you lost EV and which leaks to drill.
 - API: sessions for 6-max and heads-up, lineup presets, legal action menus, hand logs, results.
 - Web: lobby (format, lineup, stacks, feedback timing), 6-max and heads-up table, feedback sheet,
   hand result, session summary. Keyboard shortcuts 1-9 and Space.
-- Placeholders: bots use equity + personality knobs; feedback only grades call/fold with pot odds.
+- Coach: every decision gets feedback from Claude (verdict, headline, explanation, tip) with a
+  deterministic rules coach as the fallback. Background numbers (equity, pot odds, stack-to-pot,
+  approximate opening charts) feed the coach and show only in the end-of-hand review.
+- Placeholders: bots use equity + personality knobs; equity is vs random hands; charts are approximate.
 
 ## Milestones
 
@@ -54,9 +57,9 @@ you lost EV and which leaks to drill.
 - Compute the best response against the locked strategy. That powers the "Against Rex" column:
   the EV of each action against this bot, next to the balanced frequencies.
 
-### 5. Coach explanations (about a week)
-- Send the structured feedback (verdict, EVs, frequencies, equity, range breakdown, opponent
-  tendencies) to Claude and ask for two or three plain sentences. The prompt forbids new numbers.
+### 5. Coach follow-ups (a few days)
+- The per-decision coach is done. As solver data lands (milestones 2-4), pass it into the coach
+  prompt so verdicts get sharper, and show solver lines in the hand review.
 - Add "Ask a follow-up" on the review screen with the same structured context.
 
 ### 6. Multiway pots

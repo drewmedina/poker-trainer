@@ -1,7 +1,7 @@
 // Mirrors server/src/main/java/com/pokertrainer/server/api/Dto.java. Keep the two in sync.
 
 export type TableFormat = 'SIX_MAX' | 'HEADS_UP';
-export type Verdict = 'GOOD' | 'INACCURACY' | 'MISTAKE' | 'INFO';
+export type Verdict = 'GOOD' | 'INACCURACY' | 'MISTAKE';
 export type ActionType = 'FOLD' | 'CHECK' | 'CALL' | 'BET' | 'RAISE';
 
 export interface BotView {
@@ -14,6 +14,7 @@ export interface BotView {
 export interface LobbyView {
   bots: BotView[];
   presets: Record<string, string[]>;
+  aiCoach: boolean;
 }
 
 export interface CreateSessionRequest {
@@ -82,28 +83,67 @@ export interface SessionView {
   format: TableFormat;
   handNumber: number;
   netBb: number;
-  evLostBb: number;
   decisions: number;
   goodDecisions: number;
   mistakes: number;
+  aiCoach: boolean;
   hand: HandView | null;
 }
 
-export interface FeedbackView {
-  verdict: Verdict;
-  evLossBb: number;
-  headline: string;
-  detail: string;
-  equity: number;
-  potOdds: number;
-  frequencies: Record<string, number>;
-  multiway: boolean;
-  estimate: boolean;
-  source: string;
+/** Returned right after an action. The coach's feedback is fetched separately. */
+export interface DecisionView {
+  handNumber: number;
+  index: number;
+  street: string;
   actionLabel: string;
 }
 
 export interface ActionResult {
   session: SessionView;
-  feedback: FeedbackView;
+  decision: DecisionView;
+}
+
+/** source: "ai" (Claude) or "rules" (built-in fallback). */
+export interface CoachView {
+  verdict: Verdict;
+  headline: string;
+  explanation: string;
+  tip: string;
+  source: 'ai' | 'rules';
+}
+
+/** Background numbers, only shown in the hand review. */
+export interface NumbersView {
+  equity: number;
+  potOdds: number;
+  spr: number;
+  chartPosition: string | null;
+  chartOpens: boolean | null;
+  chartShare: number;
+  mathVerdict: Verdict | null;
+  mathEvLossBb: number;
+  mathNote: string | null;
+}
+
+export interface DecisionReview {
+  index: number;
+  street: string;
+  position: string;
+  board: string[];
+  potBb: number;
+  toCallBb: number;
+  playersInHand: number;
+  actionLabel: string;
+  options: string[];
+  coach: CoachView;
+  numbers: NumbersView;
+}
+
+export interface ReviewView {
+  handNumber: number;
+  finished: boolean;
+  heroCards: string[];
+  board: string[];
+  result: ResultView | null;
+  decisions: DecisionReview[];
 }

@@ -162,6 +162,11 @@ export function Lobby({ initial, onStart }: Props) {
             ]}
           />
         </div>
+        {lobby && !lobby.aiCoach && (
+          <span className="setting" title="Set ANTHROPIC_API_KEY on the server to turn on the AI coach">
+            Rules coach (AI coach off)
+          </span>
+        )}
         <button type="button" className="btn btn-cream sit-down" onClick={start} disabled={starting || !lobby}>
           {starting ? 'DEALING…' : sixMax ? 'SIT DOWN' : `SIT DOWN VS ${opponentName.toUpperCase()}`}
         </button>
