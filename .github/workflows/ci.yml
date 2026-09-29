@@ -14,15 +14,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      # No wrapper is committed yet, so pin a Gradle version here. Once `gradle wrapper`
-      # is run and committed, switch these steps to ./gradlew.
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.10.2'
       - name: Test
-        run: gradle test --no-daemon
+        run: ./gradlew test --no-daemon
       - name: Build the server distribution
-        run: gradle :server:installDist --no-daemon
+        run: ./gradlew :server:installDist --no-daemon
 
   web:
     name: Web app
