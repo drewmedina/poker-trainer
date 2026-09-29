@@ -1,0 +1,15 @@
+# Gradle / Java
+.gradle/
+build/
+out/
+*.class
+
+# Node
+node_modules/
+web/dist/
+
+# IDEs and OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
